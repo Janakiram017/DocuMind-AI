@@ -4,6 +4,7 @@ Main Application
 """
 
 import os
+import time
 import streamlit as st
 
 from config import *
@@ -39,6 +40,20 @@ if "ready" not in st.session_state:
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 
+if "document_count" not in st.session_state:
+    st.session_state.document_count = 0
+
+if "chunk_count" not in st.session_state:
+    st.session_state.chunk_count = 0
+
+if "question_count" not in st.session_state:
+    st.session_state.question_count = 0
+
+if "response_time" not in st.session_state:
+    st.session_state.response_time = 0.0
+
+if "model_name" not in st.session_state:
+    st.session_state.model_name = OLLAMA_MODEL
 # ------------------------------------
 # Sidebar
 # ------------------------------------
@@ -67,6 +82,38 @@ with st.sidebar:
         use_container_width=True
     )
 
+    st.divider()
+
+    # -------------------------------
+    # Analytics Dashboard
+    # -------------------------------
+
+    st.subheader("📊 Dashboard")
+
+    st.metric(
+        "📄 PDFs",
+        st.session_state.document_count
+    )
+
+    st.metric(
+        "🧩 Chunks",
+        st.session_state.chunk_count
+    )
+
+    st.metric(
+        "💬 Questions",
+        st.session_state.question_count
+    )
+
+    st.metric(
+        "⚡ Last Response",
+        f"{st.session_state.response_time:.2f} sec"
+    )
+
+    st.metric(
+        "🤖 Model",
+        st.session_state.model_name
+    )
 # ------------------------------------
 # Clear Chat
 # ------------------------------------
@@ -116,8 +163,10 @@ if process:
             st.session_state.vectorstore = build_vectorstore(
                 documents
             )
-
-        st.session_state.ready = True
+            st.session_state.document_count = len(uploaded_files)
+            st.session_state.chunk_count = len(documents)
+            
+            st.session_state.ready = True
 
         preview = "\n".join(
             doc.page_content
@@ -129,6 +178,7 @@ if process:
             st.session_state.summary = generate_summary(preview)
 
         st.success("✅ Documents processed successfully!")
+        st.rerun()
 # ------------------------------------
 # Main Page
 # ------------------------------------
@@ -210,6 +260,7 @@ else:
                 st.session_state.vectorstore,
                 question
             )
+            start_time = time.time()
 
             stream = stream_answer(
                 context,
@@ -233,6 +284,9 @@ else:
 
             response_placeholder.markdown(answer)
 
+            st.session_state.response_time = time.time() - start_time
+            st.session_state.question_count += 1
+
             sources = format_sources(docs)
 
             with st.expander("📄 Sources"):
@@ -248,6 +302,7 @@ else:
                 "sources": sources,
             }
         )
+        st.rerun()
 
 st.divider()
 

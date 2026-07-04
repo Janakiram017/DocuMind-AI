@@ -9,7 +9,7 @@ import streamlit as st
 from config import *
 from rag import process_pdf
 from vectorstore import build_vectorstore
-from chatbot import ask_question
+from chatbot import retrieve_context, stream_answer
 from utils import clear_database, clear_uploads, format_sources
 from summary import generate_summary
 
@@ -200,29 +200,46 @@ else:
         # Assistant message
         with st.chat_message("assistant"):
 
-            with st.spinner("🤖 Thinking..."):
+            history = ""
 
-                history = ""
+            for msg in st.session_state.messages[-6:]:
 
-                for msg in st.session_state.messages[-6:]:
+                history += f"{msg['role']}: {msg['content']}\n"
 
-                    history += f"{msg['role']}: {msg['content']}\n"
+            context, docs = retrieve_context(
+                st.session_state.vectorstore,
+                question
+            )
 
-                answer, docs = ask_question(
-                    st.session_state.vectorstore,
-                    question,
-                    history
-                )
+            stream = stream_answer(
+                context,
+                question,
+                history
+            )
 
-                st.markdown(answer)
+            response_placeholder = st.empty()
 
-                sources = format_sources(docs)
+            answer = ""
 
-                with st.expander("📄 Sources"):
+            for chunk in stream:
 
-                    for source in sources:
+                if hasattr(chunk, "content"):
 
-                        st.write(source)
+                    answer += chunk.content
+
+                    response_placeholder.markdown(
+                        answer + "▌"
+                    )
+
+            response_placeholder.markdown(answer)
+
+            sources = format_sources(docs)
+
+            with st.expander("📄 Sources"):
+
+                for source in sources:
+
+                    st.write(source)
 
         st.session_state.messages.append(
             {

@@ -18,13 +18,13 @@ Current Question:
 {question}
 
 Instructions:
-- Use the conversation history to understand follow-up questions.
-- If the answer is not present in the documents, say:
+- Use the conversation history.
+- If the answer is not in the documents, say:
   "I couldn't find this information in the uploaded documents."
 - Keep answers clear and concise.
 """
 
-def ask_question(vectorstore, question, history=""):
+def retrieve_context(vectorstore, question):
 
     retriever = vectorstore.as_retriever(
         search_kwargs={"k": TOP_K_RESULTS}
@@ -37,16 +37,21 @@ def ask_question(vectorstore, question, history=""):
         for doc in docs
     )
 
+    return context, docs
+
+
+def stream_answer(context, question, history=""):
+
     prompt = ChatPromptTemplate.from_template(
         SYSTEM_PROMPT
     )
 
     chain = prompt | load_llm()
 
-    response = chain.invoke({
-        "history": history,
-        "context": context,
-        "question": question
-    })
-
-    return response.content, docs
+    return chain.stream(
+        {
+            "history": history,
+            "context": context,
+            "question": question,
+        }
+    )

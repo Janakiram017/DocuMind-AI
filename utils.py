@@ -29,28 +29,40 @@ def clear_database():
 
 def format_sources(docs):
 
-    pages = []
+    sources = []
+
+    seen = set()
 
     for doc in docs:
 
         page = doc.metadata.get("page", 0) + 1
 
         source = Path(
-
             doc.metadata.get(
-
                 "source",
-
                 "Unknown"
-
             )
-
         ).name
 
-        pages.append(
+        snippet = " ".join(doc.page_content.split())
 
-            f"📄 {source} (Page {page})"
+        # Limit snippet length
+        if len(snippet) > 220:
+            snippet = snippet[:220] + "..."
 
+        key = (source, page)
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        formatted = (
+            f"📄 **{source}**\n\n"
+            f"📍 **Page {page}**\n\n"
+            f"> {snippet}"
         )
 
-    return sorted(set(pages))
+        sources.append(formatted)
+
+    return sources

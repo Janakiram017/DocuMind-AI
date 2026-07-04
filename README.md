@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="DocuMind AI Banner" width="100%">
+</p>
+
 # 🤖 DocuMind AI
 
 > An AI-powered Research Assistant that lets you chat with your PDF documents using **Local LLMs (Llama 3.2)**, **LangChain**, and **ChromaDB**.

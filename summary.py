@@ -2,27 +2,45 @@
 Document Summarizer
 """
 
+import json
 from llm import load_llm
 
 PROMPT = """
 You are an AI Research Assistant.
 
-Below is the beginning of a document.
+Analyze the document below.
 
 {text}
 
-Generate:
+Return ONLY valid JSON.
 
-1. Document Title
+Use this format exactly:
 
-2. Five Key Topics
+{{
+    "title": "",
+    "topics": [
+        "",
+        "",
+        "",
+        "",
+        ""
+    ],
+    "summary": "",
+    "questions": [
+        "",
+        "",
+        "",
+        "",
+        ""
+    ]
+}}
 
-3. A short summary (150 words max)
-
-4. Five questions the user can ask.
-
-Return in markdown.
+Do not write markdown.
+Do not explain anything.
+Only return JSON.
 """
+
+
 
 def generate_summary(text):
 
@@ -32,4 +50,16 @@ def generate_summary(text):
         PROMPT.format(text=text[:5000])
     )
 
-    return response.content
+    try:
+        data = json.loads(response.content)
+
+    except json.JSONDecodeError:
+
+        data = {
+            "title": "Unknown",
+            "topics": [],
+            "summary": response.content,
+            "questions": []
+        }
+
+    return data

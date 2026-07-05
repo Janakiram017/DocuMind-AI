@@ -13,6 +13,7 @@ from vectorstore import build_vectorstore
 from chatbot import retrieve_context, stream_answer
 from utils import clear_database, clear_uploads, format_sources
 from summary import generate_summary
+from components.sidebar import render_sidebar
 
 # ------------------------------------
 # Page Configuration
@@ -23,6 +24,20 @@ st.set_page_config(
     page_icon=PAGE_ICON,
     layout="wide"
 )
+# ------------------------------------
+# Load Custom CSS
+# ------------------------------------
+
+def load_css():
+
+    with open("assets/style.css") as f:
+
+        st.markdown(
+            f"<style>{f.read()}</style>",
+            unsafe_allow_html=True
+        )
+
+load_css()
 
 # ------------------------------------
 # Session State
@@ -39,6 +54,12 @@ if "ready" not in st.session_state:
 
 if "summary" not in st.session_state:
     st.session_state.summary = ""
+
+if "suggested_questions" not in st.session_state:
+    st.session_state.suggested_questions = []
+
+if "selected_question" not in st.session_state:
+    st.session_state.selected_question = None
 
 if "document_count" not in st.session_state:
     st.session_state.document_count = 0
@@ -60,11 +81,33 @@ if "model_name" not in st.session_state:
 
 with st.sidebar:
 
-    st.title("🤖 DocuMind AI")
+    st.markdown("""
+# 🤖 DocuMind AI
 
-    st.caption("Intelligent Research Assistant")
+<span style="color:#9CA3AF;">
+Intelligent Research Assistant
+</span>
+""", unsafe_allow_html=True)
 
-    st.divider()
+    st.markdown("---")
+
+# --------------------------------
+# Status
+# --------------------------------
+
+    if st.session_state.ready:
+
+        st.success(
+            f"🟢 Ready • {st.session_state.document_count} PDF(s) Loaded"
+        )
+
+    else:
+
+        st.info(
+            "📄 No documents loaded"
+        )
+
+    st.markdown("---")
 
     uploaded_files = st.file_uploader(
         "Upload PDF files",
@@ -84,36 +127,47 @@ with st.sidebar:
 
     st.divider()
 
-    # -------------------------------
-    # Analytics Dashboard
-    # -------------------------------
+# ------------------------------------
+# Analytics Dashboard
+# ------------------------------------
 
-    st.subheader("📊 Dashboard")
+    st.markdown("### 📊 Analytics")
 
-    st.metric(
-        "📄 PDFs",
-        st.session_state.document_count
-    )
+    st.markdown(f"""
+    <div style="
+    background:#1C2128;
+    padding:18px;
+    border-radius:15px;
+    border:1px solid #30363D;
+    line-height:2;
+    ">
 
-    st.metric(
-        "🧩 Chunks",
-        st.session_state.chunk_count
-    )
+    <b>📄 Documents</b>
+    <span style="float:right;">{st.session_state.document_count}</span>
+    <br>
 
-    st.metric(
-        "💬 Questions",
-        st.session_state.question_count
-    )
+    <b>🧩 Chunks</b>
+    <span style="float:right;">{st.session_state.chunk_count}</span>
+    <br>
 
-    st.metric(
-        "⚡ Last Response",
-        f"{st.session_state.response_time:.2f} sec"
-    )
+    <b>💬 Questions</b>
+    <span style="float:right;">{st.session_state.question_count}</span>
+    <br>
 
-    st.metric(
-        "🤖 Model",
-        st.session_state.model_name
-    )
+    <b>⚡ Response</b>
+    <span style="float:right;">{st.session_state.response_time:.2f} s</span>
+    <br>
+
+    <hr style="border:0.5px solid #30363D;">
+
+    <b>🤖 Model</b><br>
+    <span style="color:#58A6FF;">
+    {st.session_state.model_name}
+    </span>
+
+    </div>
+    """, unsafe_allow_html=True)
+
 # ------------------------------------
 # Clear Chat
 # ------------------------------------
@@ -175,32 +229,44 @@ if process:
 
         with st.spinner("Generating AI Summary..."):
 
-            st.session_state.summary = generate_summary(preview)
+            data = generate_summary(preview)
+
+            st.session_state.summary = data
+            st.session_state.suggested_questions = data["questions"]
 
         st.success("✅ Documents processed successfully!")
-        st.rerun()
+
+        # st.rerun()
 # ------------------------------------
 # Main Page
 # ------------------------------------
 
-st.title("📚 DocuMind AI")
+st.markdown("""
+<div style="
+    padding:30px;
+    border-radius:18px;
+    background:linear-gradient(135deg,#1E293B,#111827);
+    border:1px solid #30363D;
+    margin-bottom:25px;
+">
 
-st.markdown(
-    "### Chat with your documents using **Llama 3.2**"
-)
+<h1 style="margin:0;">
+🤖 DocuMind AI
+</h1>
 
-st.divider()
-# ------------------------------------
-# AI Research Summary
-# ------------------------------------
+<h3 style="color:#9CA3AF;margin-top:10px;">
+AI-Powered Research Assistant
+</h3>
 
-if st.session_state.ready and st.session_state.summary:
+<p style="font-size:18px;color:#D1D5DB;">
+Search • Summarize • Analyze • Chat with your PDF documents using
+<b>Llama 3.2</b>, <b>LangChain</b>, and <b>ChromaDB</b>.
+</p>
 
-    st.subheader("📄 AI Research Summary")
+</div>
+""", unsafe_allow_html=True)
 
-    st.markdown(st.session_state.summary)
 
-    st.divider()
 
 if not st.session_state.ready:
 
@@ -228,10 +294,20 @@ else:
 
                         st.write(source)
 
-    # Chat Input
-    question = st.chat_input(
+# ------------------------------------
+# Chat Input
+# ------------------------------------
+
+    typed_question = st.chat_input(
         "Ask anything about your documents..."
     )
+
+    question = typed_question
+
+    if question is None and st.session_state.selected_question:
+
+        question = st.session_state.selected_question
+        st.session_state.selected_question = None
 
     if question:
 
@@ -302,7 +378,51 @@ else:
                 "sources": sources,
             }
         )
-        st.rerun()
+        # ------------------------------------
+        # AI Research Summary
+        # ------------------------------------
+
+    if st.session_state.ready and st.session_state.summary:
+
+        with st.expander("📄 AI Research Summary", expanded=True):
+
+            st.markdown(
+                f"## 📌 {st.session_state.summary['title']}"
+            )
+
+            st.markdown("### 🧩 Key Topics")
+
+            for topic in st.session_state.summary["topics"]:
+
+                st.markdown(f"- {topic}")
+
+            st.markdown("### 📝 Summary")
+
+            st.write(st.session_state.summary["summary"])
+
+        st.divider()
+
+
+# ------------------------------------
+# Suggested Questions
+# ------------------------------------
+
+if st.session_state.suggested_questions:
+
+    st.subheader("💡 Suggested Questions")
+
+    for i, question in enumerate(st.session_state.suggested_questions):
+
+        if st.button(
+            f"💬 {question}",
+            key=f"suggestion_{i}",
+            use_container_width=True,
+        ):
+            st.session_state.selected_question = question
+            #st.rerun()
+
+    st.divider()
+    #st.rerun()
 
 st.divider()
 

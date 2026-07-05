@@ -1,5 +1,7 @@
 import streamlit as st
 
+from components.dashboard import render_dashboard
+
 
 def render_sidebar():
 
@@ -14,16 +16,11 @@ Intelligent Research Assistant
     st.markdown("---")
 
     if st.session_state.ready:
-
         st.success(
             f"🟢 Ready • {st.session_state.document_count} PDF(s) Loaded"
         )
-
     else:
-
-        st.info(
-            "📄 No documents loaded"
-        )
+        st.info("📄 No documents loaded")
 
     st.markdown("---")
 
@@ -44,5 +41,7 @@ Intelligent Research Assistant
     )
 
     st.divider()
+
+    render_dashboard()
 
     return uploaded_files, process, clear

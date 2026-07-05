@@ -14,7 +14,15 @@ from chatbot import retrieve_context, stream_answer
 from utils import clear_database, clear_uploads, format_sources
 from summary import generate_summary
 from components.sidebar import render_sidebar
-
+from components.hero import render_hero
+from components.dashboard import render_dashboard
+from components.summary import render_summary
+from components.suggestions import render_suggestions
+from components.chat import (
+    render_chat_history,
+    render_chat_input,
+    render_assistant_response,
+)
 # ------------------------------------
 # Page Configuration
 # ------------------------------------
@@ -81,92 +89,9 @@ if "model_name" not in st.session_state:
 
 with st.sidebar:
 
-    st.markdown("""
-# 🤖 DocuMind AI
+    uploaded_files, process, clear = render_sidebar()
 
-<span style="color:#9CA3AF;">
-Intelligent Research Assistant
-</span>
-""", unsafe_allow_html=True)
 
-    st.markdown("---")
-
-# --------------------------------
-# Status
-# --------------------------------
-
-    if st.session_state.ready:
-
-        st.success(
-            f"🟢 Ready • {st.session_state.document_count} PDF(s) Loaded"
-        )
-
-    else:
-
-        st.info(
-            "📄 No documents loaded"
-        )
-
-    st.markdown("---")
-
-    uploaded_files = st.file_uploader(
-        "Upload PDF files",
-        type=["pdf"],
-        accept_multiple_files=True
-    )
-
-    process = st.button(
-        "📚 Process Documents",
-        use_container_width=True
-    )
-
-    clear = st.button(
-        "🗑 Clear Chat",
-        use_container_width=True
-    )
-
-    st.divider()
-
-# ------------------------------------
-# Analytics Dashboard
-# ------------------------------------
-
-    st.markdown("### 📊 Analytics")
-
-    st.markdown(f"""
-    <div style="
-    background:#1C2128;
-    padding:18px;
-    border-radius:15px;
-    border:1px solid #30363D;
-    line-height:2;
-    ">
-
-    <b>📄 Documents</b>
-    <span style="float:right;">{st.session_state.document_count}</span>
-    <br>
-
-    <b>🧩 Chunks</b>
-    <span style="float:right;">{st.session_state.chunk_count}</span>
-    <br>
-
-    <b>💬 Questions</b>
-    <span style="float:right;">{st.session_state.question_count}</span>
-    <br>
-
-    <b>⚡ Response</b>
-    <span style="float:right;">{st.session_state.response_time:.2f} s</span>
-    <br>
-
-    <hr style="border:0.5px solid #30363D;">
-
-    <b>🤖 Model</b><br>
-    <span style="color:#58A6FF;">
-    {st.session_state.model_name}
-    </span>
-
-    </div>
-    """, unsafe_allow_html=True)
 
 # ------------------------------------
 # Clear Chat
@@ -241,30 +166,7 @@ if process:
 # Main Page
 # ------------------------------------
 
-st.markdown("""
-<div style="
-    padding:30px;
-    border-radius:18px;
-    background:linear-gradient(135deg,#1E293B,#111827);
-    border:1px solid #30363D;
-    margin-bottom:25px;
-">
-
-<h1 style="margin:0;">
-🤖 DocuMind AI
-</h1>
-
-<h3 style="color:#9CA3AF;margin-top:10px;">
-AI-Powered Research Assistant
-</h3>
-
-<p style="font-size:18px;color:#D1D5DB;">
-Search • Summarize • Analyze • Chat with your PDF documents using
-<b>Llama 3.2</b>, <b>LangChain</b>, and <b>ChromaDB</b>.
-</p>
-
-</div>
-""", unsafe_allow_html=True)
+render_hero()
 
 
 
@@ -277,37 +179,18 @@ if not st.session_state.ready:
 else:
 
     # Display previous conversation
-    for message in st.session_state.messages:
-
-        with st.chat_message(message["role"]):
-
-            st.markdown(message["content"])
-
-            if (
-                message["role"] == "assistant"
-                and "sources" in message
-            ):
-
-                with st.expander("📄 Sources"):
-
-                    for source in message["sources"]:
-
-                        st.write(source)
+    render_chat_history()
+# ------------------------------------
+# AI Research Summary
+# ------------------------------------
+    
+    render_summary()
 
 # ------------------------------------
 # Chat Input
 # ------------------------------------
 
-    typed_question = st.chat_input(
-        "Ask anything about your documents..."
-    )
-
-    question = typed_question
-
-    if question is None and st.session_state.selected_question:
-
-        question = st.session_state.selected_question
-        st.session_state.selected_question = None
+    question = render_chat_input()
 
     if question:
 
@@ -326,102 +209,14 @@ else:
         # Assistant message
         with st.chat_message("assistant"):
 
-            history = ""
-
-            for msg in st.session_state.messages[-6:]:
-
-                history += f"{msg['role']}: {msg['content']}\n"
-
-            context, docs = retrieve_context(
-                st.session_state.vectorstore,
-                question
-            )
-            start_time = time.time()
-
-            stream = stream_answer(
-                context,
-                question,
-                history
-            )
-
-            response_placeholder = st.empty()
-
-            answer = ""
-
-            for chunk in stream:
-
-                if hasattr(chunk, "content"):
-
-                    answer += chunk.content
-
-                    response_placeholder.markdown(
-                        answer + "▌"
-                    )
-
-            response_placeholder.markdown(answer)
-
-            st.session_state.response_time = time.time() - start_time
-            st.session_state.question_count += 1
-
-            sources = format_sources(docs)
-
-            with st.expander("📄 Sources"):
-
-                for source in sources:
-
-                    st.write(source)
-
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": answer,
-                "sources": sources,
-            }
-        )
-        # ------------------------------------
-        # AI Research Summary
-        # ------------------------------------
-
-    if st.session_state.ready and st.session_state.summary:
-
-        with st.expander("📄 AI Research Summary", expanded=True):
-
-            st.markdown(
-                f"## 📌 {st.session_state.summary['title']}"
-            )
-
-            st.markdown("### 🧩 Key Topics")
-
-            for topic in st.session_state.summary["topics"]:
-
-                st.markdown(f"- {topic}")
-
-            st.markdown("### 📝 Summary")
-
-            st.write(st.session_state.summary["summary"])
-
-        st.divider()
+            render_assistant_response(question)
 
 
 # ------------------------------------
 # Suggested Questions
 # ------------------------------------
 
-if st.session_state.suggested_questions:
-
-    st.subheader("💡 Suggested Questions")
-
-    for i, question in enumerate(st.session_state.suggested_questions):
-
-        if st.button(
-            f"💬 {question}",
-            key=f"suggestion_{i}",
-            use_container_width=True,
-        ):
-            st.session_state.selected_question = question
-            #st.rerun()
-
-    st.divider()
+render_suggestions()
     #st.rerun()
 
 st.divider()
